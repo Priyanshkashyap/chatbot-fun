@@ -17,7 +17,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: "You are a helpful AI tutor.",
+            content: "You are a helpful AI tutor.", // The system prompt SHOULD be sent on every request.LLMs do NOT remember anything between requests.Every API call is completely fresh.
           },
           {
             role: "user",
