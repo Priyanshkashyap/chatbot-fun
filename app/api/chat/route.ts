@@ -24,7 +24,7 @@ export async function POST(req: Request) {
           {
             role: "system",
             content:
-              "You are a helpful AI tutor.",//  send everytime as llm forgets everything thus sees entire chat at once
+              body.systemPrompt,//  send everytime as llm forgets everything thus sees entire chat at once
           },
 
           // Entire conversation history

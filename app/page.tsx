@@ -7,7 +7,11 @@ export default function Home() {
 
   // Current textarea input
   const [input, setInput] = useState("");
-
+  // custom chatbot personality
+  const [systemPrompt, setSystemPrompt] =
+  useState(
+    "You are a helpful AI tutor."
+  );
   // Chat history
   const [messages, setMessages] = useState<
     {
@@ -43,6 +47,7 @@ export default function Home() {
             ...messages,
             userMessage,  // UI state variable and api call me its not synced so we change the variable separately
           ],
+          systemPrompt: systemPrompt,
         }
       );
 
@@ -81,7 +86,13 @@ export default function Home() {
       <h1 className="text-3xl font-bold mb-6">
         AI Chatbot
       </h1>
-
+      <input
+        className="border p-3 w-full mb-4"
+        value={systemPrompt}
+        onChange={(e) =>
+        setSystemPrompt(e.target.value)
+  }
+/>
       {/* Input */}
       <textarea
         className="border p-3 w-full"
