@@ -29,9 +29,10 @@ export async function POST(req: Request) {
 
           // Entire conversation history
           ...body.messages,
+  
 
         ],
-
+        temperature: body.temperature,
       });
 
     return NextResponse.json({

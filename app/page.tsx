@@ -19,7 +19,8 @@ export default function Home() {
       content: string;
     }[]
   >([]);
-
+  const [temperature, setTemperature] = useState(0.7);
+// the more of it the more creative replies instead of factual
   const [loading, setLoading] = useState(false);
 
   async function sendMessage() {
@@ -48,6 +49,7 @@ export default function Home() {
             userMessage,  // UI state variable and api call me its not synced so we change the variable separately
           ],
           systemPrompt: systemPrompt,
+          temperature:temperature,
         }
       );
 
@@ -102,7 +104,18 @@ export default function Home() {
           setInput(e.target.value)
         }
       />
+      <input
+    type="range"
+    min="0"
+    max="1"
+    step="0.1"
+    value={temperature}
+    onChange={(e) =>
+    setTemperature(Number(e.target.value))
+  }
+/>
 
+<p>{temperature}</p>
       {/* Send button */}
       <button
         onClick={sendMessage}
