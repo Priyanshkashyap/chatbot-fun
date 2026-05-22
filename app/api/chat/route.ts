@@ -1,5 +1,20 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { z } from "zod";
+const TicketSchema = z.object({
+  category: z.enum([
+    "billing",
+    "refund",
+    "technical",
+    "general",
+  ]),
+
+  priority: z.enum([
+    "low",
+    "medium",
+    "high",
+  ]),
+});
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
@@ -52,9 +67,10 @@ export async function POST(req: Request) {
       });
      const rawReply = completion.choices[0].message.content;
      const parsedReply = JSON.parse(rawReply || "{}"); // we wanna make into json format
+     const validatedReply = TicketSchema.parse(parsedReply); // we dont trust ai blindly to return exactly what we asked so use zod to confirm
     return NextResponse.json({
       reply:
-        parsedReply,
+        validatedReply,
     });
 
   } catch (error: any) {
