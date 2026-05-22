@@ -49,7 +49,7 @@ export default function Home() {
             userMessage,  // UI state variable and api call me its not synced so we change the variable separately
           ],
           systemPrompt: systemPrompt,
-          temperature:temperature,
+          temperature:temperature, // here in one bracket we are sending every single thing as we dont care here itll be seen in the backend
         }
       );
 
@@ -134,11 +134,15 @@ export default function Home() {
             className="border p-4 rounded"
           >
 
-            <p className="font-bold mb-2">
-              {msg.role}
-            </p>
-
-            <p>{msg.content}</p>
+            <pre>
+            {JSON.stringify(msg.role, null, 2)} 
+            </pre>
+            {
+              /* see browser cannot render json objects directly so first convert into string */
+            }
+            <pre>
+            {JSON.stringify(msg.content, null, 2)}
+            </pre>
 
           </div>
 

@@ -24,20 +24,37 @@ export async function POST(req: Request) {
           {
             role: "system",
             content:
-              body.systemPrompt,//  send everytime as llm forgets everything thus sees entire chat at once
+              `
+          You are a support ticket classifier.
+
+          ONLY respond in valid JSON.
+
+          Response format:
+
+         {
+          "category": "billing | refund | technical | general",
+          "priority": "low | medium | high"
+         }
+         `,
           },
 
-          // Entire conversation history
-          ...body.messages,
+         
+          {
+    role: "user",
+
+    content:
+      body.messages.at(-1)?.content, // only the latest message
+  },
   
 
         ],
         temperature: body.temperature,
       });
-
+     const rawReply = completion.choices[0].message.content;
+     const parsedReply = JSON.parse(rawReply || "{}"); // we wanna make into json format
     return NextResponse.json({
       reply:
-        completion.choices[0].message.content,
+        parsedReply,
     });
 
   } catch (error: any) {
@@ -53,3 +70,13 @@ export async function POST(req: Request) {
 
   }
 }
+
+/* Few-shot prompting teaches the model:
+
+format
+behavior
+style
+structure
+expectations
+
+without training a model. */
