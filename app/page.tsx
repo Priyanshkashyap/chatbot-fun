@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import axios from "axios";
 export default function Home() {
 
   // Current textarea input
@@ -28,92 +28,57 @@ export default function Home() {
 
   async function sendMessage() {
 
-    if (!input.trim()) return; // checks for whitespace input too
+  try {
 
     setLoading(true);
 
-    // User message
     const userMessage = {
       role: "user",
       content: input,
     };
 
-    // Add user message instantly
+    // Add user message
     setMessages((prev) => [
       ...prev,
       userMessage,
     ]);
 
-    // Clear textarea
-    setInput("");
+    // Send request
+    const response =
+      await axios.post(
+        "/api/chat",
+        {
+          messages: [
+            ...messages,
+            userMessage,
+          ],
+        }
+      );
 
-    const response = await fetch("/api/chat", { //Axios does not support streaming responses in the browser as cleanly as fetch.
-      method: "POST",
+    // Assistant reply
+    const assistantMessage = {
+      role: "assistant",
+      content: response.data.reply,
+    };
 
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify({
-        messages: [
-        ...messages,
-        userMessage,
-                  ],
-        systemPrompt,
-        temperature,
-}),
-    });
-
-    const reader =
-      response.body?.getReader(); // so return from Response gets received by frontend as response.body..getReader() gives you a tool to manually read chunks from that stream.
-
-    if (!reader) {
-      setLoading(false);
-      return;
-    }
-
-    const decoder = new TextDecoder();//decode the bytes sent here
-
-    let streamedText = "";// This stores the FULL assistant response progressively.
-
-    // Empty assistant message placeholder
+    // Add assistant reply
     setMessages((prev) => [
       ...prev,
-      {
-        role: "assistant", // kuch bhi reply se pehle assistant ka naam ayega na bas bina message ke
-        content: "",
-      },
+      assistantMessage,
     ]);
 
-    while (true) {
+    setInput("");
 
-      const { done, value } =
-        await reader.read(); // till we are reading the stream done is false and theres a value. when everything is read , done is true and value becomes undefined
+  } catch (error) {
 
-      if (done) break;
+    console.log(error);
 
-      const chunkValue =
-        decoder.decode(value); // decodes
-
-      streamedText += chunkValue;// string joining
-
-      // Update latest assistant message
-      setMessages((prev) => {
-
-        const updated = [...prev]; // React state must be immutable.Instead create a new array.
-
-        updated[updated.length - 1] = {
-          role: "assistant",
-          content: streamedText, // thus dhire dhire streamed text gets added to the last index of 
-        };
-
-        return updated;
-      });
-    }
+  } finally {
 
     setLoading(false);
-  }
 
+  }
+}
   return (
 
     <div className="p-10 max-w-2xl mx-auto">

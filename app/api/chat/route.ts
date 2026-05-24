@@ -2,47 +2,110 @@ import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
+  baseURL:
+    "https://api.groq.com/openai/v1",
 });
+function getWeather(city: string) {
 
-export async function POST(req: Request) {
+  return `Weather in ${city} is 35°C`;
 
-  const body = await req.json(); // sidha reads and converts body only
+}
+function calculator(
+  expression: string
+) {
 
-  const completion = await client.chat.completions.create({ // sending to groq servers
-    model: "llama-3.3-70b-versatile",
+  return eval(expression); // takes string and returns output as math
+
+}
+
+export async function POST(
+  req: Request
+) {
+
+  const body = await req.json();
+
+  const completion =
+    await client.chat.completions.create({ // llms should receieve messages in string only
+
+      model:
+        "llama-3.3-70b-versatile",
 
       messages: [
 
         {
           role: "system",
-          content: body.systemPrompt,
+
+          content: `
+You are an AI assistant.
+
+Available tools:
+
+1. calculator
+- use for math calculations
+
+Format:
+{
+  "tool": "calculator",
+  "input": "25 * 16"
+}
+
+2. weather
+- use for weather questions
+
+Format:
+{
+  "tool": "weather",
+  "city": "Delhi"
+}
+
+ONLY respond in valid JSON.
+`,
         },
 
         ...body.messages,
+
       ],
 
-    stream: true,
+    });
+
+  const rawReply =
+    completion.choices[0].message.content;
+
+  const parsedReply =
+    JSON.parse(rawReply || "{}");
+
+  if (
+    parsedReply.tool ===
+    "calculator"
+  ) {
+
+  const result = String(
+  calculator(parsedReply.input)
+);
+
+    return Response.json({
+      reply: result,
+    });
+
+  }
+if (
+    parsedReply.tool ===
+    "weather"
+  ) {
+
+    const result = getWeather(
+      parsedReply.city
+    );
+
+    return Response.json({
+      reply: result,
+    });
+
+  }
+  return Response.json({
+    reply: rawReply, 
   });
 
-  const encoder = new TextEncoder();// ReadableStream can only send: binary data,bytes,Uint8Array,NOT normal JavaScript strings.So TextEncoder converts:string into bytes
-
-  const stream = new ReadableStream({// You are creating a live data stream i.e. a server pipe where data can be pushed continuously.
-    async start(controller) { // start() runs immediately when the frontend connects to this stream.The controller is used to control the stream.
-
-      for await (const chunk of completion) {// completion is an async iterable stream coming from Groq/OpenAI.for await waits for each chunk automatically.
-
-        const text =
-          chunk.choices[0]?.delta?.content || ""; // extracts from each chunk.?. prevents crashes as Sometimes chunks contain metadata instead of text.Why || "" as Sometimes content is undefined.
-
-        controller.enqueue( // push data into stream and thus frontend continously 
-          encoder.encode(text) // encodes from string to bytes for eg
-        );
-      }
-
-      controller.close();// end stream
-    },
-  });
-
-  return new Response(stream); // sending streams over time and not entire json object at once so dont use nextResponse
 }
+// u should have checks for every single possible thing whether it is the intended data type or not no matter how trustworthy it seems
+//Build A Real Agent Loop by sending the parsed replies again to ai and generate another answer sentence from it (can make a long chain of llm api calls too using different tools)
