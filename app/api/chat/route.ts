@@ -1,111 +1,245 @@
 import OpenAI from "openai";
-
+import { promptt } from "@/app/prompt";
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL:
     "https://api.groq.com/openai/v1",
 });
+
+// WEATHER TOOL
 function getWeather(city: string) {
 
   return `Weather in ${city} is 35°C`;
 
 }
+
+// CALCULATOR TOOL
 function calculator(
   expression: string
 ) {
 
-  return eval(expression); // takes string and returns output as math
+  return eval(expression);
 
 }
+
+// TOOL REGISTRY
+const tools = {
+  calculator,
+  weather: getWeather,
+};
 
 export async function POST(
   req: Request
 ) {
 
-  const body = await req.json();
+  try {
 
-  const completion =
-    await client.chat.completions.create({ // llms should receieve messages in string only
+    const body = await req.json();
 
-      model:
-        "llama-3.3-70b-versatile",
+    // ONLY KEEP LAST 10 MESSAGES
+    const recentMessages =
+      body.messages
+        .slice(-10)
+        .map((msg: any) => ({
 
-      messages: [
+          ...msg,
 
-        {
-          role: "system",
+          // LLMs only accept strings
+          content:
+            typeof msg.content ===
+            "string"
+              ? msg.content
+              : JSON.stringify(
+                  msg.content
+                ),
 
-          content: `
-You are an AI assistant.
+        }));
 
-Available tools:
+    // FIRST LLM CALL
+    const completion =
+      await client.chat.completions.create({
 
-1. calculator
-- use for math calculations
+        model:
+          "llama-3.3-70b-versatile",
 
-Format:
-{
-  "tool": "calculator",
-  "input": "25 * 16"
-}
+        messages: [
 
-2. weather
-- use for weather questions
+          {
+            role: "system",
 
-Format:
-{
-  "tool": "weather",
-  "city": "Delhi"
-}
+            content: promptt,
+          },
 
-ONLY respond in valid JSON.
-`,
-        },
+          ...recentMessages,
 
-        ...body.messages,
+        ],
 
-      ],
+      });
 
-    });
+    const rawReply =
+      completion.choices[0]
+        .message.content;
 
-  const rawReply =
-    completion.choices[0].message.content;
+    // SAFE JSON PARSING
+    let parsedReply;
 
-  const parsedReply =
-    JSON.parse(rawReply || "{}");
+    try {
 
-  if (
-    parsedReply.tool ===
-    "calculator"
-  ) {
+      parsedReply =
+        JSON.parse(
+          rawReply || "{}"
+        );
 
-  const result = String(
-  calculator(parsedReply.input)
-);
+    } catch {
+
+      return Response.json({
+        reply:
+          "Invalid JSON from AI",
+      });
+
+    }
+ 
+    const toolName =
+      parsedReply.tool as keyof typeof tools; // "Trust me TypeScript,this value WILL be one of the valid tool keys."
+
+    // CHECK TOOL EXISTS
+    if (!tools[toolName]) {
+      // tools is an object
+      return Response.json({
+        reply:
+          "Invalid tool requested",
+      });
+
+    }
+
+    // VALIDATE CALCULATOR INPUT
+    if (
+      toolName ===
+        "calculator" &&
+      typeof parsedReply.input !==
+        "string"
+    ) {
+
+      return Response.json({
+        reply:
+          "Invalid calculator input",
+      });
+
+    }
+
+    // VALIDATE WEATHER INPUT
+    if (
+      toolName === "weather" &&
+      typeof parsedReply.city !==
+        "string"
+    ) {
+
+      return Response.json({
+        reply:
+          "Invalid weather input",
+      });
+
+    }
+
+    const selectedTool =
+      tools[toolName];
+
+    let result;
+
+    // TOOL EXECUTION
+    try {
+
+      if (
+        toolName ===
+        "calculator"
+      ) {
+
+        result = String(
+          selectedTool(
+            parsedReply.input
+          )
+        );
+
+      }
+
+      if (
+        toolName === "weather"
+      ) {
+
+        result = selectedTool(
+          parsedReply.city
+        );
+
+      }
+
+    } catch {
+
+      return Response.json({
+        reply:
+          "Tool execution failed",
+      });
+
+    }
+
+    // SECOND LLM CALL
+    // AI sees tool result and responds naturally
+    const finalCompletion =
+      await client.chat.completions.create({
+
+        model:
+          "llama-3.3-70b-versatile",
+
+        messages: [
+
+          {
+            role: "system",
+
+            content:
+              "You are a helpful AI assistant.",
+          },
+
+          ...recentMessages,
+
+          {
+            role: "assistant",
+
+            content:
+              JSON.stringify(
+                parsedReply
+              ),
+          },
+
+          {
+            role: "user",
+
+            content:
+              `Tool result: ${result}`,
+          },
+
+        ],
+
+      });
+
+    const finalReply =
+      finalCompletion
+        .choices[0]
+        .message.content;
 
     return Response.json({
-      reply: result,
+      reply: finalReply,
     });
 
-  }
-if (
-    parsedReply.tool ===
-    "weather"
-  ) {
+  } catch (error: any) {
 
-    const result = getWeather(
-      parsedReply.city
+    console.log(error);
+
+    return Response.json(
+      {
+        error: error.message,
+      },
+      { status: 500 }
     );
 
-    return Response.json({
-      reply: result,
-    });
-
   }
-  return Response.json({
-    reply: rawReply, 
-  });
 
 }
-// u should have checks for every single possible thing whether it is the intended data type or not no matter how trustworthy it seems
-//Build A Real Agent Loop by sending the parsed replies again to ai and generate another answer sentence from it (can make a long chain of llm api calls too using different tools)
